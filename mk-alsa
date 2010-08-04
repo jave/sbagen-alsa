@@ -5,7 +5,7 @@
 #       omits them.  To build the libraries, see the 'mk-libmad-linux'
 #       and 'mk-tremor-linux' scripts.
 
-OPT="-DT_LINUX_ALSA -Wall -O3 -s -lm -lpthread  `pkg-config --cflags alsa`"
+OPT="-DT_LINUX_ALSA -Wall -g  -lm -lpthread  `pkg-config --cflags alsa`"
 LIBS="`pkg-config --libs alsa`"
 
 echo $OPT $LIBS
@@ -20,5 +20,5 @@ echo $OPT $LIBS
     LIBS="$LIBS libs/linux-libvorbisidec.a"
 }
 
-cc $OPT sbagen.c $LIBS -o sbagen || exit 1
+gcc $OPT sbagen.c $LIBS -o sbagen || exit 1
 

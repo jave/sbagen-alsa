@@ -63,6 +63,13 @@
 #define ANSI_TTY
 #endif
 
+#ifdef T_LINUX_ALSA
+#define ALSA_AUDIO
+#define UNIX_TIME
+#define UNIX_MISC
+#define ANSI_TTY
+#endif
+
 #ifdef T_MINGW
 #define WIN_AUDIO
 #define WIN_TIME
@@ -92,9 +99,11 @@
 
 // Make sure NO_AUDIO is set if necessary
 #ifndef OSS_AUDIO
+#ifndef ALSA_AUDIO
 #ifndef MAC_AUDIO
 #ifndef WIN_AUDIO
 #define NO_AUDIO
+#endif
 #endif
 #endif
 #endif
@@ -138,6 +147,10 @@
 
 #ifdef T_MINGW
  #define vsnprintf _vsnprintf
+#endif
+
+#ifdef ALSA_AUDIO
+#include <alsa/asoundlib.h>
 #endif
 
 #ifdef OSS_AUDIO
@@ -456,6 +469,10 @@ char *pdir;			// Program directory (used as second place to look for -m files)
  static AudioDeviceID aud_dev;
 #endif
 
+#ifdef ALSA_AUDIO
+#define BUFFER_SIZE 4096*4
+snd_pcm_t *playback_handle;
+#endif
 //
 //	Delay for a short period of time (in ms)
 //
@@ -848,6 +865,12 @@ scanOptions(int *acp, char ***avp) {
 	     opt_d= *argv++;
 	     break;
 #endif
+#ifdef ALSA_AUDIO
+	  case 'd':
+	     if (argc-- < 1) error("Expecting device filename after -d");
+	     opt_d= *argv++;
+	     break;
+#endif             
 	  case 'R':
 	     if (argc-- < 1 || 1 != sscanf(*argv++, "%d %c", &out_prate, &dmy)) 
 		error("Expecting integer after -R");
@@ -1607,6 +1630,20 @@ writeOut(char *buf, int siz) {
   }
 #endif
 
+
+#ifdef ALSA_AUDIO
+  int err;
+  if (out_fd == -9999) {
+      if ((err = snd_pcm_writei (playback_handle, buf, 128)) != 128) {
+        fprintf (stderr, "write to audio interface failed (%s)\n",
+                 snd_strerror (err));
+        exit (1);
+      }
+    return;
+  }
+#endif
+
+  
   while (-1 != (rv= write(out_fd, buf, siz))) {
     if (0 == (siz -= rv)) return;
     buf += rv;
@@ -2069,10 +2106,48 @@ setup_device(void) {
     }
   }
 #endif
+#ifdef ALSA_AUDIO
+  //boilerplate alsa device init code
+  int i;
+  int err;
+  short buf[128];
+  snd_pcm_hw_params_t *hw_params;
+  if ((err = snd_pcm_open (&playback_handle, opt_d, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
+    fprintf (stderr, "cannot open audio device %s (%s)\n", 
+             opt_d,
+             snd_strerror (err));
+    exit (1);
+             }
+  if ((err = snd_pcm_set_params(playback_handle,
+                                out_mode ? SND_PCM_FORMAT_S16_LE : SND_PCM_FORMAT_S8,
+                                SND_PCM_ACCESS_RW_INTERLEAVED,
+                                2,
+                                out_rate,
+                                1,
+                                500000)) < 0) {   /* 0.5sec */
+    printf("Playback open error: %s\n", snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+//sbagen audio init
+  out_buf_ms= out_buf_lo >> 16;
+  out_bsiz= BUFFER_SIZE;
+    out_blen= out_mode ? out_bsiz/2 : out_bsiz;
+    out_bps= out_mode ? 4 : 2;
+    out_buf= (short*)Alloc(out_blen * sizeof(short));
+    out_buf_lo= (int)(0x10000 * 1000.0 * 0.5 * out_blen / out_rate);
+    out_buf_ms= out_buf_lo >> 16;
+    out_buf_lo &= 0xFFFF;
+    tmp_buf= (int*)Alloc(out_blen * sizeof(int));
+
+    
+    out_fd= -9999;
+    
+#endif
 #ifdef NO_AUDIO
   error("Direct output to soundcard not supported on this platform.\n"
 	"Use -o or -O to write raw data, or -Wo or -WO to write a WAV file.");
 #endif
+  
 }
 
 //
