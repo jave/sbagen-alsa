@@ -1630,15 +1630,20 @@ writeOut(char *buf, int siz) {
   }
 #endif
 
-
+  
 #ifdef ALSA_AUDIO
-  int err;
+  long frames;
   if (out_fd == -9999) {
-      if ((err = snd_pcm_writei (playback_handle, buf, 128)) != 128) {
-        fprintf (stderr, "write to audio interface failed (%s)\n",
-                 snd_strerror (err));
-        exit (1);
+        frames = snd_pcm_writei(playback_handle, buf, sizeof(buf));
+        if (frames < 0)
+          frames = snd_pcm_recover(playback_handle, frames, 0);
+        if (frames < 0) {
+        printf("snd_pcm_writei failed: %s\n", snd_strerror(frames));
+        exit(1);
       }
+        if (frames > 0 && frames < (long)sizeof(buf))
+          printf("Short write (expected %li, wrote %li)\n", (long)sizeof(buf), frames);
+        
     return;
   }
 #endif
@@ -2108,10 +2113,7 @@ setup_device(void) {
 #endif
 #ifdef ALSA_AUDIO
   //boilerplate alsa device init code
-  int i;
   int err;
-  short buf[128];
-  snd_pcm_hw_params_t *hw_params;
   if ((err = snd_pcm_open (&playback_handle, opt_d, SND_PCM_STREAM_PLAYBACK, 0)) < 0) {
     fprintf (stderr, "cannot open audio device %s (%s)\n", 
              opt_d,
