@@ -470,7 +470,6 @@ char *pdir;			// Program directory (used as second place to look for -m files)
 #endif
 
 #ifdef ALSA_AUDIO
-#define BUFFER_SIZE 4096*4
 snd_pcm_t *playback_handle;
 #endif
 //
@@ -1634,16 +1633,17 @@ writeOut(char *buf, int siz) {
 #ifdef ALSA_AUDIO
   long frames;
   if (out_fd == -9999) {
-        frames = snd_pcm_writei(playback_handle, buf, sizeof(buf));
-        if (frames < 0)
-          frames = snd_pcm_recover(playback_handle, frames, 0);
-        if (frames < 0) {
-        printf("snd_pcm_writei failed: %s\n", snd_strerror(frames));
-        exit(1);
-      }
-        if (frames > 0 && frames < (long)sizeof(buf))
-          printf("Short write (expected %li, wrote %li)\n", (long)sizeof(buf), frames);
-        
+    //printf("siz:%d\n",siz);
+    frames = snd_pcm_writei(playback_handle, buf, siz/4);//WTF is 4?
+    if (frames < 0)
+      frames = snd_pcm_recover(playback_handle, frames, 0);
+    if (frames < 0) {
+      printf("snd_pcm_writei failed: %s\n", snd_strerror(frames));
+      exit(1);
+    }
+    if (frames > 0 && frames < (long)sizeof(buf))
+      printf("Short write (expected %li, wrote %li)\n", (long)siz, frames);
+    
     return;
   }
 #endif
@@ -2121,19 +2121,18 @@ setup_device(void) {
     exit (1);
              }
   if ((err = snd_pcm_set_params(playback_handle,
-                                out_mode ? SND_PCM_FORMAT_S16_LE : SND_PCM_FORMAT_S8,
+                                out_mode ? SND_PCM_FORMAT_S16 : SND_PCM_FORMAT_S8,
                                 SND_PCM_ACCESS_RW_INTERLEAVED,
                                 2,
                                 out_rate,
-                                1,
-                                500000)) < 0) {   /* 0.5sec */
+                                0,
+                                50000000)) < 0) {   /* 0.5sec */
     printf("Playback open error: %s\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
 //sbagen audio init
-  out_buf_ms= out_buf_lo >> 16;
-  out_bsiz= BUFFER_SIZE;
-    out_blen= out_mode ? out_bsiz/2 : out_bsiz;
+  out_bsiz= 16*1024;
+  out_blen= out_mode ? out_bsiz/2 : out_bsiz;
     out_bps= out_mode ? 4 : 2;
     out_buf= (short*)Alloc(out_blen * sizeof(short));
     out_buf_lo= (int)(0x10000 * 1000.0 * 0.5 * out_blen / out_rate);
