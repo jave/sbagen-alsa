@@ -43,6 +43,7 @@
 // Ogg and MP3 support is handled separately from the T_* macros.
 
 // Define OSS_AUDIO to use /dev/dsp for audio output
+// Define OSS_ALSA for alsa support
 // Define WIN_AUDIO to use Win32 calls
 // Define MAC_AUDIO to use Mac CoreAudio calls
 // Define NO_AUDIO if no audio output device is usable
@@ -300,6 +301,9 @@ help() {
 #ifdef OSS_AUDIO
 	  NL "          -d dev    Select a different output device instead of /dev/dsp"
 #endif
+#ifdef ALSA_AUDIO
+	  NL "          -d dev    Select a different output device instead of hw:0,0"
+#endif
 	  NL "          -c spec   Compensate for low-frequency headphone roll-off; see docs"
 	  NL
 	  );
@@ -437,8 +441,11 @@ int opt_L= -1;			// Length in ms, or -1
 int opt_T= -1;			// Start time in ms, or -1
 char *opt_o;			// File name to output to, or 0
 char *opt_m;			// File name to read mix data from, or 0
+#ifdef ALSA_AUDIO
+char *opt_d= "hw:0,0";	// Output device
+#else
 char *opt_d= "/dev/dsp";	// Output device
-
+#endif
 FILE *mix_in;			// Input stream for mix sound data, or 0
 int mix_cnt;			// Version number from mix filename (#<digits>), or -1
 int bigendian;			// Is this platform Big-endian?
@@ -1631,19 +1638,20 @@ writeOut(char *buf, int siz) {
 
   
 #ifdef ALSA_AUDIO
-  long frames;
+  long frames_written, frames_to_write=siz/4;//i think 4  because stereo, 2 bytes per sample
+  
   if (out_fd == -9999) {
     //printf("siz:%d\n",siz);
-    frames = snd_pcm_writei(playback_handle, buf, siz/4);//WTF is 4?
-    if (frames < 0)
-      frames = snd_pcm_recover(playback_handle, frames, 0);
-    if (frames < 0) {
-      printf("snd_pcm_writei failed: %s\n", snd_strerror(frames));
-      exit(1);
+    while(frames_to_write>0){
+      frames_written = snd_pcm_writei(playback_handle, buf, frames_to_write);
+      if (frames_written < 0) {
+        printf("snd_pcm_writei failed: %s\n", snd_strerror(frames_written));
+        exit(1);
+      }
+      //printf("%d\n",frames_written);
+      buf += frames_written * 4;
+      frames_to_write -= frames_written;
     }
-    if (frames > 0 && frames < (long)sizeof(buf))
-      printf("Short write (expected %li, wrote %li)\n", (long)siz, frames);
-    
     return;
   }
 #endif
@@ -2119,19 +2127,26 @@ setup_device(void) {
              opt_d,
              snd_strerror (err));
     exit (1);
-             }
+  }
   if ((err = snd_pcm_set_params(playback_handle,
                                 out_mode ? SND_PCM_FORMAT_S16 : SND_PCM_FORMAT_S8,
                                 SND_PCM_ACCESS_RW_INTERLEAVED,
                                 2,
                                 out_rate,
-                                0,
-                                50000000)) < 0) {   /* 0.5sec */
+                                1,
+                                500000)) < 0) {   /* 0.5sec */
+
     printf("Playback open error: %s\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
+    snd_pcm_hw_params_t* hw_params;
+    snd_pcm_uframes_t p_size;
+    snd_pcm_hw_params_alloca(&hw_params);
+    snd_pcm_hw_params_current(playback_handle, hw_params);
+    snd_pcm_hw_params_get_buffer_size(hw_params, &p_size);
+    printf("buffer size:%d\n", p_size);  
 //sbagen audio init
-  out_bsiz= 16*1024;
+    out_bsiz= 1024*8;//p_size*2;
   out_blen= out_mode ? out_bsiz/2 : out_bsiz;
     out_bps= out_mode ? 4 : 2;
     out_buf= (short*)Alloc(out_blen * sizeof(short));
