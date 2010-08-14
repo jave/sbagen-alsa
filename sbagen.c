@@ -302,7 +302,7 @@ help() {
 	  NL "          -d dev    Select a different output device instead of /dev/dsp"
 #endif
 #ifdef ALSA_AUDIO
-	  NL "          -d dev    Select a different output device instead of hw:0,0"
+	  NL "          -d dev    Select a different output device instead of default"
 #endif
 	  NL "          -c spec   Compensate for low-frequency headphone roll-off; see docs"
 	  NL
@@ -442,7 +442,7 @@ int opt_T= -1;			// Start time in ms, or -1
 char *opt_o;			// File name to output to, or 0
 char *opt_m;			// File name to read mix data from, or 0
 #ifdef ALSA_AUDIO
-char *opt_d= "hw:0,0";	// Output device
+char *opt_d= "default";	// Output device
 #else
 char *opt_d= "/dev/dsp";	// Output device
 #endif
