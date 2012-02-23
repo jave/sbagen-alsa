@@ -2144,8 +2144,7 @@ setup_device(void) {
     snd_pcm_hw_params_alloca(&hw_params);
     snd_pcm_hw_params_current(playback_handle, hw_params);
     snd_pcm_hw_params_get_buffer_size(hw_params, &p_size);
-    printf("buffer size:%d\n", p_size);  
-//sbagen audio init
+    //sbagen audio init
     out_bsiz= 1024*8;//p_size*2;
   out_blen= out_mode ? out_bsiz/2 : out_bsiz;
     out_bps= out_mode ? 4 : 2;

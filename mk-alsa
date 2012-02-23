@@ -5,20 +5,21 @@
 #       omits them.  To build the libraries, see the 'mk-libmad-linux'
 #       and 'mk-tremor-linux' scripts.
 
-OPT="-DT_LINUX_ALSA -Wall -g  -lm -lpthread  `pkg-config --cflags alsa`"
-LIBS="`pkg-config --libs alsa`"
+OPT="-DT_LINUX_ALSA -Wall -g  -lm -lpthread  `pkg-config --cflags alsa` -DOGG_DECODE" 
+LIBS="`pkg-config --libs alsa` `pkg-config --libs vorbisfile`"
 
 echo $OPT $LIBS
 
 
-[ -f libs/linux-libmad.a ] && {
-    OPT="-DMP3_DECODE $OPT"
-    LIBS="$LIBS libs/linux-libmad.a"
-}
-[ -f libs/linux-libvorbisidec.a ] && {
-    OPT="-DOGG_DECODE $OPT"
-    LIBS="$LIBS libs/linux-libvorbisidec.a"
-}
+# [ -f libs/linux-libmad.a ] && {
+#     OPT="-DMP3_DECODE $OPT"
+#     LIBS="$LIBS libs/linux-libmad.a"
+# }
+# [ -f libs/linux-libvorbisidec.a ] && {
+#     OPT="-DOGG_DECODE $OPT"
+#     LIBS="$LIBS libs/linux-libvorbisidec.a"
+# }
+
 
 gcc $OPT sbagen.c $LIBS -o sbagen || exit 1
 
