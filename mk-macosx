@@ -1,0 +1,32 @@
+#!/bin/sh
+
+#       Building on Mac OSX.  Note: only compiles in OGG and MP3
+#       support if the libraries are already setup within libs/,
+#       otherwise omits them.  To get an idea of how to build the
+#       libraries, see the 'mk-libmad-linux' and 'mk-tremor-linux'
+#       scripts.  The only difference is that on Mac OSX the
+#       'authgen.sh' line doesn't work, and you have to run
+#       './configure' instead.  Also it might be necessary to run
+#       'ranlib' on the resulting .a files.
+
+CFLAGS="-DT_MACOSX -I/System/Library/Frameworks/Carbon.framework/Headers -fpascal-strings"
+LIBS="-framework Carbon -framework CoreAudio"
+
+xx=libs/macosx-libmad.a
+[ -f $xx ] && {
+    CFLAGS="-DMP3_DECODE $CFLAGS"
+    LIBS="$LIBS $xx"
+    ranlib $xx	# OSX is fussy if you copy .a files and insists you run 'ranlib' on them
+}
+
+xx=libs/macosx-libvorbisidec.a
+[ -f $xx ] && {
+    CFLAGS="-DOGG_DECODE $CFLAGS"
+    LIBS="$LIBS $xx"
+    ranlib $xx	# OSX is fussy if you copy .a files and insists you run 'ranlib' on them
+}
+
+CC="cc $CFLAGS -Wall -O3 -s $LIBS -lm -lpthread"
+
+$CC sbagen.c -o sbagen || exit 1
+
